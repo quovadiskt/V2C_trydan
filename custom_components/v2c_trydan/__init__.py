@@ -74,7 +74,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         except ValueError:
             _LOGGER.error(f"Invalid min_intensity: {min_intensity}. Must be an integer.")
 
-    async def async_set_dynamic_power_mode(call: ServiceCall):
+    async def handle_set_dynamic_power_mode(call: ServiceCall):
+        # BUG FIX: Přejmenováno z async_set_dynamic_power_mode na handle_set_dynamic_power_mode,
+        # aby se zabránilo rekurzivnímu volání - vnořená funkce měla stejné jméno jako
+        # modulová funkce async_set_dynamic_power_mode() níže, a volala samu sebe místo ní.
         dynamic_power_mode = call.data.get("DynamicPowerMode")
         try:
             dynamic_power_mode = int(dynamic_power_mode)
@@ -94,7 +97,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
                 #_LOGGER.debug(f"Valid max_intensity: {max_intensity}")
                 await async_set_max_intensity(hass, coordinator.ip_address, max_intensity)
             else:
-                _LOGGER.error("max_intensity must be between 6 y 32")
+                _LOGGER.error("max_intensity must be between 6 and 32")
         except ValueError:
             _LOGGER.error(f"Invalid max_intensity: {max_intensity}. Must be an integer.")
 
@@ -106,7 +109,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
                 #_LOGGER.debug(f"Valid intensity: {intensity}")
                 await async_set_intensity(hass, coordinator.ip_address, intensity)
             else:
-                _LOGGER.error("intensity must be between 6 y 32")
+                _LOGGER.error("intensity must be between 6 and 32")
         except ValueError:
             _LOGGER.error(f"Invalid intensity: {intensity}. Must be an integer.")
 
@@ -124,7 +127,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
                     else:
                         _LOGGER.error("Entry data not found for setting min_intensity_slider")
                 else:
-                    _LOGGER.error("v2c_min_intensity must be between 6 y 32")
+                    _LOGGER.error("v2c_min_intensity must be between 6 and 32")
             except ValueError:
                 _LOGGER.error(f"Invalid v2c_min_intensity: {min_intensity}. Must be an integer.")
         else:
@@ -140,11 +143,13 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
                     if entry:
                         ip_address = coordinator.ip_address
                         #_LOGGER.debug(f"Calling async_set_dynamic_power_mode with IP: {ip_address} and dynamic_power_mode: {dynamic_power_mode}")
+                        # BUG FIX: Voláme modulovou funkci async_set_dynamic_power_mode, ne vnořenou
+                        # (vnořená handle_set_dynamic_power_mode má jiné jméno, takže zde nehrozí rekurze)
                         await async_set_dynamic_power_mode(hass, coordinator.ip_address, dynamic_power_mode)
                     else:
                         _LOGGER.error("Entry data not found for setting dynamic_power_mode_slider")
                 else:
-                    _LOGGER.error("v2c_dynamic_power_mode must be between 0 y 7")
+                    _LOGGER.error("v2c_dynamic_power_mode must be between 0 and 7")
             except ValueError:
                 _LOGGER.error(f"Invalid v2c_dynamic_power_mode: {dynamic_power_mode}. Must be an integer.")
         else:
@@ -164,7 +169,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
                     else:
                         _LOGGER.error("Entry data not found for setting max_intensity_slider")
                 else:
-                    _LOGGER.error("v2c_max_intensity must be between 6 y 32")
+                    _LOGGER.error("v2c_max_intensity must be between 6 and 32")
             except ValueError:
                 _LOGGER.error(f"Invalid v2c_max_intensity: {max_intensity}. Must be an integer.")
         else:
@@ -172,7 +177,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     hass.services.async_register(DOMAIN, "set_min_intensity", set_min_intensity)
     hass.services.async_register(DOMAIN, "set_max_intensity", set_max_intensity)
-    hass.services.async_register(DOMAIN, "set_dynamic_power_mode", async_set_dynamic_power_mode)
+    hass.services.async_register(DOMAIN, "set_dynamic_power_mode", handle_set_dynamic_power_mode)
     hass.services.async_register(DOMAIN, "set_intensity", set_intensity)
     hass.services.async_register(DOMAIN, "set_min_intensity_slider", set_min_intensity_slider)
     hass.services.async_register(DOMAIN, "set_max_intensity_slider", set_max_intensity_slider)

@@ -3,13 +3,9 @@ import asyncio
 from datetime import timedelta, datetime, timezone
 
 import aiohttp
-import re
-import async_timeout
 import voluptuous as vol
 
 from homeassistant.const import (
-    CONF_NAME,
-    STATE_UNKNOWN,
     CONF_IP_ADDRESS,
 )
 from homeassistant.core import HomeAssistant, callback
@@ -21,19 +17,13 @@ from homeassistant.components.sensor import (
 )
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity import EntityCategory
-from homeassistant.exceptions import PlatformNotReady
 from homeassistant.helpers import entity_registry
-from homeassistant.helpers.aiohttp_client import async_get_clientsession
-from homeassistant.helpers.entity import Entity
 from homeassistant.helpers.event import (
     async_track_time_interval,
     async_track_state_change_event,
-    async_call_later,
 )
 from homeassistant.helpers.update_coordinator import (
     CoordinatorEntity,
-    DataUpdateCoordinator,
-    UpdateFailed,
 )
 
 from .const import DOMAIN, CONF_KWH_PER_100KM, CONF_PRECIO_LUZ
@@ -409,20 +399,10 @@ class V2CtrydanSensor(CoordinatorEntity, SensorEntity):
     def available(self):
         """Return if entity is available."""
         return self.coordinator.last_update_success and self.coordinator.data is not None
-        
-    @property
-    def device_class(self):
-        return DEVICE_CLASS_MAP.get(self._data_key)
-
-    @property
-    def native_unit_of_measurement(self):
-        return NATIVE_UNIT_MAP.get(self._data_key)
-
-    @property
-    def last_reset(self):
-        if self.state_class == "total":
-            return datetime.fromisoformat('2011-11-04')
-        return None
+        # BUG FIX: Odstraněny duplikátní properties device_class, native_unit_of_measurement
+        # a last_reset, které byly definovány výše ve třídě. Duplikáty způsobovaly, že
+        # druhá definice přepisovala první a last_reset s hardcoded datem '2011-11-04'
+        # přepisoval správnou dynamickou implementaci výše.
 
 
 class ChargeKmSensor(CoordinatorEntity, SensorEntity):
@@ -484,7 +464,10 @@ class ChargeKmSensor(CoordinatorEntity, SensorEntity):
                 except ValueError:
                     km_to_charge_float = -1.0
 
-                if self.state >= km_to_charge_float and km_to_charge_float != 0:
+                # BUG FIX: self.state může být None (koordinátor ještě nemá data),
+                # porovnání None >= float by způsobilo TypeError. Přidána ochrana.
+                current_km = self.native_value
+                if current_km is not None and current_km >= km_to_charge_float and km_to_charge_float != 0:
                     await self.hass.services.async_call("switch", "turn_on", {"entity_id": "switch.v2c_trydan_switch_paused"})
                     await self.hass.services.async_call("switch", "turn_on", {"entity_id": "switch.v2c_trydan_switch_locked"})
                     await self.async_set_km_to_charge(0)
@@ -616,6 +599,11 @@ class PrecioLuzEntity(CoordinatorEntity, SensorEntity):
 
     @property
     def extra_state_attributes(self):
+        # BUG FIX: Původní kód v update_state() volal self.extra_state_attributes["ValidHours"] = ...
+        # ale property vždy vrací NOVÝ dict, takže zápis do něj se okamžitě ztratil.
+        # Oprava: valid_hours, valid_hours_next_day a total_hours jsou uloženy jako
+        # instance atributy (self.valid_hours atd.) a property je pouze čte a vrací.
+        # Zápis self.extra_state_attributes["ValidHours"] = ... v update_state() byl odstraněn.
         if self.v2c_precio_luz_entity is not None:
             attributes = self.v2c_precio_luz_entity.attributes.copy()
             attributes["ValidHours"] = self.valid_hours
@@ -702,13 +690,13 @@ class PrecioLuzEntity(CoordinatorEntity, SensorEntity):
                 max_price = float(max_price_entity.state)
                 current_hour = datetime.now().hour
 
+                # BUG FIX: Uložíme vypočtené hodnoty jako instance atributy.
+                # Původní kód pak zapisoval do self.extra_state_attributes["ValidHours"] = ...
+                # což nefungovalo (property vrací nový dict, zápis se ztratí).
+                # Stačí uložit do self.valid_hours atd. — property je při čtení vrátí.
                 self.valid_hours, self.valid_hours_next_day, self.total_hours = await extract_price_attrs(
                     precio_luz_entity, max_price, current_hour
                 )
-
-                self.extra_state_attributes["ValidHours"] = self.valid_hours
-                self.extra_state_attributes["ValidHoursNextDay"] = self.valid_hours_next_day
-                self.extra_state_attributes["TotalHours"] = self.total_hours
 
                 await pause_or_resume_charging(
                     self.state, max_price, paused_switch, v2c_carga_pvpc_switch
