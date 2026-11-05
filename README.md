@@ -129,4 +129,22 @@ mode: single
 
 ---
 
+# Related Projects & Ecosystem
+
+| Project | Type | Description |
+|:--------|:-----|:------------|
+| ⚡ [V2C Trydan Card](https://github.com/mactron254/v2c-trydan-card) | Lovelace card | Beautiful dashboard card for V2C Trydan with visual editor, 11 languages, energy monitoring. Install via HACS. |
+| 🔧 [Carbanog/V2C_trydan](https://github.com/Carbanog/V2C_trydan) | HACS integration | Alternative community integration with enhanced polling, session statistics, blueprints and diagnostics. Uses same `v2c_trydan` domain. |
+| ☁️ [HomeAssistant-V2C-Cloud](https://github.com/samuelebistoletti/HomeAssistant-V2C-Cloud) | HACS integration | Cloud-based integration (hybrid cloud + LAN). Best option if you have OCPP enabled (which disables local HTTP). |
+| ☁️ [v2c_cloud (lockevod)](https://github.com/lockevod/v2c_cloud) | HACS integration | Another cloud-only integration solving the OCPP / local HTTP conflict. |
+| 🏠 [Official V2C integration](https://www.home-assistant.io/integrations/v2c/) | HA Core | Built-in HA integration (since 2023.12). Fewer entities than this custom integration but no HACS required. |
+
+> **Which one should I use?**
+> - **This fork** (`quovadiskt/V2C_trydan`) — if you want the original Rain1971 feature set (PVPC price control, smart charge algorithm, 46 entities) with active bug fixes
+> - **Carbanog fork** — if you want a fully rewritten integration with better reliability on weak networks
+> - **Cloud integrations** — if you have OCPP enabled on your Trydan
+> - **Official HA integration** — if you prefer zero custom components and don't need PVPC features
+
+---
+
 *Originally created by [@Rain1971](https://github.com/Rain1971). Forked and maintained by [@quovadiskt](https://github.com/quovadiskt).*
